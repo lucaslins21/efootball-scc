@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Login · eFootball SCC</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="icon" type="image/svg+xml" href="favicon.svg" />
+    <link rel="stylesheet" href="styles.css" />
+    <script src="auth.js"></script>
+  </head>
+  <body>
+    <header class="topbar">
+      <div class="brand">
+        <div class="dot"></div>
+        <span>eFootball SCC</span>
+      </div>
+      <nav class="top-actions">
+        <a href="index.html">Tabela</a>
+        <a href="enviar.html">Enviar</a>
+        <a href="confrontos.html">Confrontos</a>
+        <a class="ghost-btn" id="nav-admin" href="admin.html">Admin</a>
+        <button class="ghost-btn" id="nav-logout" style="display: none">Sair</button>
+      </nav>
+    </header>
+    <main class="page narrow">
+      <section class="panel">
+        <h2>Login do admin</h2>
+        <p class="lead">Use as credenciais padrão para acessar o painel do admin.</p>
+        <form id="login-form">
+          <div class="form-row">
+            <div>
+              <label for="login-user">Usuário</label>
+              <input id="login-user" type="text" placeholder="admin" required />
+            </div>
+            <div>
+              <label for="login-pass">Senha</label>
+              <input id="login-pass" type="password" placeholder="adminpass" required />
+            </div>
+          </div>
+          <button class="btn" type="submit">Entrar</button>
+        </form>
+        <div id="login-feedback" class="feedback"></div>
+      </section>
+    </main>
+    <script src="login.js"></script>
+  </body>
+</html>

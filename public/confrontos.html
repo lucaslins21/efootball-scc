@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Confrontos · eFootball SCC</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="icon" type="image/svg+xml" href="favicon.svg" />
+    <link rel="stylesheet" href="styles.css" />
+    <script src="auth.js"></script>
+  </head>
+  <body>
+    <header class="topbar">
+      <div class="brand">
+        <div class="dot"></div>
+        <span>eFootball SCC</span>
+      </div>
+      <nav class="top-actions">
+        <a href="index.html">Tabela</a>
+        <a href="enviar.html">Enviar</a>
+        <a class="active" href="confrontos.html">Confrontos</a>
+        <a class="ghost-btn" id="nav-admin" href="admin.html">Admin</a>
+        <button class="ghost-btn" id="nav-logout" style="display: none">Sair</button>
+      </nav>
+    </header>
+
+    <main class="page narrow">
+      <section class="hero hero-small">
+        <div>
+          <div class="pill">Head-to-head</div>
+          <h2>Veja quem leva vantagem em cada duelo.</h2>
+          <p>Escolha dois jogadores e explore histórico, vitórias e gols.</p>
+        </div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-header">
+          <div>
+            <h2>Histórico de confrontos</h2>
+            <p class="lead">Dados só levam em conta partidas aprovadas.</p>
+          </div>
+        </div>
+        <div class="form-row">
+          <div>
+            <label for="h2h-a">Jogador 1</label>
+            <select id="h2h-a"></select>
+          </div>
+          <div>
+            <label for="h2h-b">Jogador 2</label>
+            <select id="h2h-b"></select>
+          </div>
+        </div>
+        <div id="h2h-stats" class="stat-grid"></div>
+        <div class="cards" id="h2h-list"></div>
+      </section>
+    </main>
+    <script src="confrontos.js"></script>
+  </body>
+</html>

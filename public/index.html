@@ -1,0 +1,116 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Tabela · eFootball SCC</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="icon" type="image/svg+xml" href="favicon.svg" />
+    <link rel="stylesheet" href="styles.css" />
+    <script src="auth.js"></script>
+  </head>
+  <body>
+    <header class="topbar">
+      <div class="brand">
+        <div class="dot"></div>
+        <span>eFootball SCC</span>
+      </div>
+      <nav class="top-actions">
+        <a class="active" href="index.html">Tabela</a>
+        <a href="enviar.html">Enviar</a>
+        <a href="confrontos.html">Confrontos</a>
+        <a class="ghost-btn" id="nav-admin" href="login.html">Admin</a>
+        <button class="ghost-btn" id="nav-logout" style="display: none">Sair</button>
+      </nav>
+    </header>
+
+    <main class="page">
+      <section class="hero stats-only">
+        <div class="stat-grid hero-stats">
+          <div class="stat">
+            <div class="label">Partidas aprovadas</div>
+            <div class="value" id="total-matches">0</div>
+          </div>
+          <div class="stat">
+            <div class="label">Gols marcados</div>
+            <div class="value" id="total-goals">0</div>
+          </div>
+          <div class="stat">
+            <div class="label">Jogadores ativos</div>
+            <div class="value" id="total-players">0</div>
+          </div>
+        </div>
+      </section>
+
+      <div class="grid wide">
+        <section class="panel" id="tabela">
+          <div class="panel-header">
+            <div>
+              <h2>Classificação</h2>
+              <p class="lead">Ordene e busque pelo jogador.</p>
+            </div>
+            <div class="filters row">
+              <select id="sort-by">
+                <option value="pontos">Pontos</option>
+                <option value="vitorias">Vitórias</option>
+                <option value="jogos">Jogos</option>
+                <option value="aproveitamento">Aproveitamento</option>
+                <option value="golsPro">Gols Pró</option>
+                <option value="golsContra">Gols Sofridos</option>
+                <option value="saldo">Saldo de gols</option>
+              </select>
+              <input id="search-player" type="text" placeholder="Buscar jogador" />
+            </div>
+          </div>
+          <div class="table-wrap">
+            <table class="table">
+              <thead>
+                <tr>
+                  <th>Jogador</th>
+                  <th>P</th>
+                  <th>J</th>
+                  <th>V</th>
+                  <th>E</th>
+                  <th>D</th>
+                  <th>GP</th>
+                  <th>GC</th>
+                  <th>SG</th>
+                  <th>%</th>
+                </tr>
+              </thead>
+              <tbody id="leaderboard-body"></tbody>
+            </table>
+          </div>
+        </section>
+
+        <section class="panel" id="artilharia">
+          <div class="panel-header">
+            <div>
+              <h2>Artilharia</h2>
+              <p class="lead">Gols digitados, agrupados por jogador + dono.</p>
+            </div>
+            <input id="artilharia-search" type="text" placeholder="Buscar artilheiro" />
+          </div>
+          <div class="cards" id="top-scorers"></div>
+        </section>
+
+        <section class="panel" id="aprovadas">
+          <div class="match-row">
+            <div>
+              <h2>Partidas aprovadas</h2>
+              <p class="lead">Linha do tempo das partidas validadas.</p>
+            </div>
+            <a class="pill gray" href="enviar.html">Registrar jogo</a>
+          </div>
+          <div class="cards" id="recent-matches"></div>
+        </section>
+      </div>
+    </main>
+    <script src="app.js"></script>
+  </body>
+</html>

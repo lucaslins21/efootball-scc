@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Admin · eFootball SCC</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="icon" type="image/svg+xml" href="favicon.svg" />
+    <link rel="stylesheet" href="styles.css" />
+    <script src="auth.js"></script>
+  </head>
+  <body>
+    <header class="topbar">
+      <div class="brand">
+        <div class="dot"></div>
+        <span>eFootball SCC</span>
+      </div>
+      <nav class="top-actions">
+        <a href="index.html">Tabela</a>
+        <a href="enviar.html">Enviar</a>
+        <a href="confrontos.html">Confrontos</a>
+        <a class="ghost-btn" id="nav-admin" href="login.html">Admin</a>
+        <button class="ghost-btn" id="nav-logout" style="display: none">Sair</button>
+      </nav>
+    </header>
+
+    <main class="page">
+      <section class="hero">
+        <div>
+          <div class="pill">Admin</div>
+          <h1>Painel do administrador</h1>
+          <p>Aprove ou rejeite palpites, cadastre jogadores e mantenha o campeonato organizado.</p>
+          <div class="hero-actions">
+            <a class="btn" href="index.html">Voltar para o site</a>
+          </div>
+        </div>
+      </section>
+
+      <div class="grid">
+        <section class="panel">
+          <h2>Adicionar jogador</h2>
+          <form id="player-form">
+            <div class="form-row">
+              <div>
+                <label for="player-name">Nome</label>
+                <input id="player-name" type="text" placeholder="Ex.: Lucas Lins" required />
+              </div>
+            </div>
+            <button class="btn" type="submit">Adicionar</button>
+          </form>
+          <div id="player-feedback" class="feedback"></div>
+        </section>
+
+        <section class="panel">
+          <div class="match-row">
+            <div>
+              <h2>Jogadores</h2>
+              <p class="lead">Edite nomes ou remova jogadores.</p>
+            </div>
+          </div>
+          <div class="cards" id="players-list"></div>
+        </section>
+
+        <section class="panel">
+          <div class="match-row">
+            <div>
+              <h2>Sugestões pendentes</h2>
+              <p class="lead">Aprove ou rejeite para atualizar a tabela.</p>
+            </div>
+            <button id="reload" class="btn secondary">Atualizar</button>
+          </div>
+          <div class="cards" id="pending-list"></div>
+        </section>
+
+        <section class="panel">
+          <div class="match-row">
+            <div>
+              <h2>Partidas aprovadas</h2>
+              <p class="lead">Edite placar ou remova confrontos.</p>
+            </div>
+            <button id="reload-matches" class="btn secondary">Atualizar</button>
+          </div>
+          <div class="cards" id="matches-list"></div>
+        </section>
+      </div>
+    </main>
+    <script src="admin.js"></script>
+  </body>
+</html>

@@ -1,0 +1,13 @@
+{
+  "name": "efootball-board",
+  "version": "0.1.0",
+  "description": "Painel simples para registrar partidas de eFootball com aprovação de admin e estatísticas.",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "@fortawesome/fontawesome-free": "^7.1.0",
+    "express": "^4.19.2"
+  }
+}
