@@ -246,12 +246,14 @@ app.post("/api/suggestions", async (req, res) => {
 app.post("/api/suggestions/:id/approve", requireAdmin, async (req, res) => {
   const { id } = req.params;
 
-  const { data: suggestion, error: fetchError } = await supabase
+  const { data: suggestionRow, error: fetchError } = await supabase
     .from("suggestions")
     .select("*")
     .eq("id", id)
     .single();
   if (fetchError) return res.status(404).json({ error: "Sugestao nao encontrada" });
+
+  const suggestion = toCamel(suggestionRow);
 
   const matchPayload = {
     ...suggestion,
