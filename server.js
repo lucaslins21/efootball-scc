@@ -1,41 +1,31 @@
 const express = require("express");
 const path = require("path");
-const fs = require("fs/promises");
 const crypto = require("crypto");
+const { createClient } = require("@supabase/supabase-js");
 
 const app = express();
 const PORT = process.env.PORT || 3000;
-const DATA_FILE = path.join(__dirname, "data", "db.json");
-const ADMIN_TOKEN = process.env.ADMIN_TOKEN || "admin123";
-// Credenciais fixas de admin
-const ADMIN_USER = "admin";
-const ADMIN_PASSWORD = "sccefootball";
+const ADMIN_TOKEN = process.env.ADMIN_TOKEN;
+const ADMIN_USER = process.env.ADMIN_USER;
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD;
 
-// Increase JSON limit to allow base64 images in evidence uploads
+const SUPABASE_URL = process.env.SUPABASE_URL;
+const SUPABASE_SERVICE_ROLE = process.env.SUPABASE_SERVICE_ROLE;
+
+if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE) {
+  console.error("Faltam variaveis SUPABASE_URL e/ou SUPABASE_SERVICE_ROLE");
+  process.exit(1);
+}
+if (!ADMIN_TOKEN || !ADMIN_USER || !ADMIN_PASSWORD) {
+  console.error("Faltam variaveis ADMIN_TOKEN, ADMIN_USER ou ADMIN_PASSWORD");
+  process.exit(1);
+}
+
+const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE);
+
 app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: true, limit: "10mb" }));
 app.use(express.static(path.join(__dirname, "public")));
-
-async function readData() {
-  try {
-    const raw = await fs.readFile(DATA_FILE, "utf-8");
-    return JSON.parse(raw);
-  } catch (err) {
-    console.error("Erro ao ler db.json", err);
-    return { players: [], suggestions: [], matches: [] };
-  }
-}
-
-async function writeData(data) {
-  await fs.writeFile(DATA_FILE, JSON.stringify(data, null, 2), "utf-8");
-}
-
-async function updateData(mutator) {
-  const data = await readData();
-  const result = await mutator(data);
-  await writeData(data);
-  return result;
-}
 
 function isAdmin(req) {
   const token = req.headers["x-admin-token"] || req.query.adminToken;
@@ -44,7 +34,7 @@ function isAdmin(req) {
 
 function requireAdmin(req, res, next) {
   if (!isAdmin(req)) {
-    return res.status(401).json({ error: "Admin token inválido" });
+    return res.status(401).json({ error: "Admin token invalido" });
   }
   next();
 }
@@ -54,262 +44,258 @@ function validateScore(value) {
   return Number.isInteger(n) && n >= 0;
 }
 
+async function ensurePlayersExist(ids = []) {
+  const { data, error } = await supabase.from("players").select("id").in("id", ids);
+  if (error) throw new Error(error.message);
+  return data.length === ids.length;
+}
+
+function normalizeScorers(raw, validOwners) {
+  if (!Array.isArray(raw)) return [];
+  return raw
+    .map((s) => ({
+      name: (s.name || s.scorerName || "").trim(),
+      goals: Number(s.goals),
+      ownerId: s.ownerId || s.playerId,
+    }))
+    .filter(
+      (s) =>
+        s.name &&
+        validateScore(s.goals) &&
+        s.goals > 0 &&
+        s.ownerId &&
+        validOwners.includes(s.ownerId)
+    )
+    .map((s) => ({ name: s.name, goals: Number(s.goals), ownerId: s.ownerId }));
+}
+
+function validateScorerSums(homeId, awayId, homeScore, awayScore, scorers) {
+  const sumHome = scorers.filter((s) => s.ownerId === homeId).reduce((acc, s) => acc + s.goals, 0);
+  const sumAway = scorers.filter((s) => s.ownerId === awayId).reduce((acc, s) => acc + s.goals, 0);
+  if (sumHome > Number(homeScore) || sumAway > Number(awayScore)) {
+    throw new Error("Gols dos artilheiros excedem o placar informado");
+  }
+}
+
 app.post("/api/admin/login", (req, res) => {
   const { user, password } = req.body || {};
   if (user === ADMIN_USER && password === ADMIN_PASSWORD) {
     return res.json({ token: ADMIN_TOKEN });
   }
-  return res.status(401).json({ error: "Credenciais inválidas" });
+  return res.status(401).json({ error: "Credenciais invalidas" });
 });
 
+// Players
 app.get("/api/players", async (_req, res) => {
-  const data = await readData();
-  res.json(data.players);
+  const { data, error } = await supabase.from("players").select("*").order("name");
+  if (error) return res.status(500).json({ error: error.message });
+  res.json(data);
 });
 
 app.post("/api/players", requireAdmin, async (req, res) => {
   const name = (req.body.name || "").trim();
-  if (!name) return res.status(400).json({ error: "Nome é obrigatório" });
+  if (!name) return res.status(400).json({ error: "Nome e obrigatorio" });
 
-  const created = await updateData((data) => {
-    const exists = data.players.some(
-      (p) => p.name.toLowerCase() === name.toLowerCase()
-    );
-    if (exists) throw new Error("Jogador já existe");
-    const player = { id: crypto.randomUUID(), name };
-    data.players.push(player);
-    return player;
-  }).catch((err) => res.status(400).json({ error: err.message }));
+  const { data, error } = await supabase
+    .from("players")
+    .insert([{ id: crypto.randomUUID(), name }])
+    .select()
+    .single();
 
-  if (created) res.json(created);
+  if (error) return res.status(400).json({ error: error.message });
+  res.json(data);
 });
 
 app.patch("/api/players/:id", requireAdmin, async (req, res) => {
   const { id } = req.params;
   const name = (req.body.name || "").trim();
-  if (!name) return res.status(400).json({ error: "Nome é obrigatório" });
+  if (!name) return res.status(400).json({ error: "Nome e obrigatorio" });
 
-  const updated = await updateData((data) => {
-    const player = data.players.find((p) => p.id === id);
-    if (!player) throw new Error("Jogador não encontrado");
-    const exists = data.players.some(
-      (p) => p.id !== id && p.name.toLowerCase() === name.toLowerCase()
-    );
-    if (exists) throw new Error("Já existe jogador com esse nome");
-    player.name = name;
-    return player;
-  }).catch((err) => res.status(400).json({ error: err.message }));
-
-  if (updated) res.json(updated);
+  const { data, error } = await supabase.from("players").update({ name }).eq("id", id).select().single();
+  if (error) return res.status(400).json({ error: error.message });
+  res.json(data);
 });
 
 app.delete("/api/players/:id", requireAdmin, async (req, res) => {
   const { id } = req.params;
-  const removed = await updateData((data) => {
-    const inUse =
-      data.matches.some((m) => m.homeId === id || m.awayId === id) ||
-      data.suggestions.some((s) => s.homeId === id || s.awayId === id);
-    if (inUse) throw new Error("Jogador em uso em partidas; remova/edite partidas antes");
-    const index = data.players.findIndex((p) => p.id === id);
-    if (index === -1) throw new Error("Jogador não encontrado");
-    data.players.splice(index, 1);
-    return true;
-  }).catch((err) => res.status(400).json({ error: err.message }));
 
-  if (removed) res.json({ ok: true });
+  const inMatches = await supabase
+    .from("matches")
+    .select("id", { count: "exact", head: true })
+    .or(`homeId.eq.${id},awayId.eq.${id}`);
+  if (inMatches.error) return res.status(500).json({ error: inMatches.error.message });
+  if ((inMatches.count || 0) > 0) {
+    return res
+      .status(400)
+      .json({ error: "Jogador em uso em partidas; remova/edite partidas antes" });
+  }
+
+  const inSuggestions = await supabase
+    .from("suggestions")
+    .select("id", { count: "exact", head: true })
+    .or(`homeId.eq.${id},awayId.eq.${id}`);
+  if (inSuggestions.error) return res.status(500).json({ error: inSuggestions.error.message });
+  if ((inSuggestions.count || 0) > 0) {
+    return res
+      .status(400)
+      .json({ error: "Jogador em uso em sugestoes; remova/edite antes" });
+  }
+
+  const { error } = await supabase.from("players").delete().eq("id", id);
+  if (error) return res.status(400).json({ error: error.message });
+  res.json({ ok: true });
 });
 
+// Suggestions
 app.get("/api/suggestions", requireAdmin, async (_req, res) => {
-  const data = await readData();
-  res.json(data.suggestions);
+  const { data, error } = await supabase
+    .from("suggestions")
+    .select("*")
+    .order("createdAt", { ascending: false });
+  if (error) return res.status(500).json({ error: error.message });
+  res.json(data);
 });
 
 app.post("/api/suggestions", async (req, res) => {
-  const { homeId, awayId, homeScore, awayScore, scorers, submittedBy, evidence } =
-    req.body;
+  const { homeId, awayId, homeScore, awayScore, scorers, submittedBy, evidence } = req.body || {};
 
   if (!homeId || !awayId || homeId === awayId) {
-    return res
-      .status(400)
-      .json({ error: "Selecione dois jogadores diferentes" });
+    return res.status(400).json({ error: "Selecione dois jogadores diferentes" });
   }
   if (!validateScore(homeScore) || !validateScore(awayScore)) {
-    return res.status(400).json({ error: "Placar inválido" });
+    return res.status(400).json({ error: "Placar invalido" });
   }
 
-  const suggestion = await updateData((data) => {
-    const playersExist = [homeId, awayId].every((id) =>
-      data.players.some((p) => p.id === id)
-    );
-    if (!playersExist) throw new Error("Jogador não encontrado");
+  const exists = await ensurePlayersExist([homeId, awayId]);
+  if (!exists) return res.status(400).json({ error: "Jogador nao encontrado" });
 
-    const validOwners = [homeId, awayId];
-    const normalizedScorers = Array.isArray(scorers)
-      ? scorers
-          .map((s) => ({
-            name: (s.name || s.scorerName || "").trim(),
-            goals: Number(s.goals),
-            ownerId: s.ownerId || s.playerId,
-          }))
-          .filter(
-            (s) =>
-              s.name &&
-              validateScore(s.goals) &&
-              s.goals > 0 &&
-              s.ownerId &&
-              validOwners.includes(s.ownerId)
-          )
-          .map((s) => ({
-            name: s.name,
-            goals: Number(s.goals),
-            ownerId: s.ownerId,
-          }))
-      : [];
+  const normalizedScorers = normalizeScorers(scorers, [homeId, awayId]);
+  try {
+    validateScorerSums(homeId, awayId, homeScore, awayScore, normalizedScorers);
+  } catch (err) {
+    return res.status(400).json({ error: err.message });
+  }
 
-    const sumHome = normalizedScorers
-      .filter((s) => s.ownerId === homeId)
-      .reduce((acc, s) => acc + s.goals, 0);
-    const sumAway = normalizedScorers
-      .filter((s) => s.ownerId === awayId)
-      .reduce((acc, s) => acc + s.goals, 0);
-    if (sumHome > Number(homeScore) || sumAway > Number(awayScore)) {
-      throw new Error("Gols dos artilheiros excedem o placar informado");
-    }
+  const payload = {
+    id: crypto.randomUUID(),
+    homeId,
+    awayId,
+    homeScore: Number(homeScore),
+    awayScore: Number(awayScore),
+    scorers: normalizedScorers,
+    submittedBy: submittedBy?.trim() || "Anonimo",
+    createdAt: new Date().toISOString(),
+    evidence: evidence && evidence.data ? evidence : null,
+  };
 
-    const payload = {
-      id: crypto.randomUUID(),
-      homeId,
-      awayId,
-      homeScore: Number(homeScore),
-      awayScore: Number(awayScore),
-      scorers: normalizedScorers,
-      submittedBy: submittedBy?.trim() || "Anônimo",
-      createdAt: new Date().toISOString(),
-      evidence: evidence && evidence.data ? evidence : null,
-    };
-
-    data.suggestions.push(payload);
-    return payload;
-  }).catch((err) => res.status(400).json({ error: err.message }));
-
-  if (suggestion) res.json(suggestion);
+  const { data, error } = await supabase.from("suggestions").insert([payload]).select().single();
+  if (error) return res.status(400).json({ error: error.message });
+  res.json(data);
 });
 
 app.post("/api/suggestions/:id/approve", requireAdmin, async (req, res) => {
   const { id } = req.params;
-  const match = await updateData((data) => {
-    const index = data.suggestions.findIndex((s) => s.id === id);
-    if (index === -1) throw new Error("Sugestão não encontrada");
-    const suggestion = data.suggestions[index];
-    data.suggestions.splice(index, 1);
 
-    const newMatch = {
-      ...suggestion,
-      evidence: null, // evidências descartáveis após aprovação
-      status: "approved",
-      approvedAt: new Date().toISOString(),
-    };
-    data.matches.push(newMatch);
-    return newMatch;
-  }).catch((err) => res.status(404).json({ error: err.message }));
+  const { data: suggestion, error: fetchError } = await supabase
+    .from("suggestions")
+    .select("*")
+    .eq("id", id)
+    .single();
+  if (fetchError) return res.status(404).json({ error: "Sugestao nao encontrada" });
 
-  if (match) res.json(match);
+  const matchPayload = {
+    ...suggestion,
+    evidence: null,
+    status: "approved",
+    approvedAt: new Date().toISOString(),
+  };
+
+  const { error: insertError, data: inserted } = await supabase
+    .from("matches")
+    .insert([matchPayload])
+    .select()
+    .single();
+  if (insertError) return res.status(400).json({ error: insertError.message });
+
+  await supabase.from("suggestions").delete().eq("id", id);
+  res.json(inserted);
 });
 
 app.delete("/api/suggestions/:id", requireAdmin, async (req, res) => {
   const { id } = req.params;
-  const removed = await updateData((data) => {
-    const index = data.suggestions.findIndex((s) => s.id === id);
-    if (index === -1) throw new Error("Sugestão não encontrada");
-    data.suggestions.splice(index, 1);
-    return true;
-  }).catch((err) => res.status(404).json({ error: err.message }));
-
-  if (removed) res.json({ ok: true });
+  const { error } = await supabase.from("suggestions").delete().eq("id", id);
+  if (error) return res.status(404).json({ error: error.message });
+  res.json({ ok: true });
 });
 
+// Matches
 app.get("/api/matches", async (_req, res) => {
-  const data = await readData();
-  res.json(data.matches);
+  const { data, error } = await supabase
+    .from("matches")
+    .select("*")
+    .order("approvedAt", { ascending: false })
+    .order("createdAt", { ascending: false });
+  if (error) return res.status(500).json({ error: error.message });
+  res.json(data);
 });
 
 app.patch("/api/matches/:id", requireAdmin, async (req, res) => {
   const { id } = req.params;
   const { homeId, awayId, homeScore, awayScore, scorers, submittedBy, evidence } = req.body || {};
 
-  const updated = await updateData((data) => {
-    const idx = data.matches.findIndex((m) => m.id === id);
-    if (idx === -1) throw new Error("Partida não encontrada");
-    const match = data.matches[idx];
-    const newHomeId = homeId || match.homeId;
-    const newAwayId = awayId || match.awayId;
-    if (!newHomeId || !newAwayId || newHomeId === newAwayId) {
-      throw new Error("Selecione dois jogadores diferentes");
-    }
-    const playersExist = [newHomeId, newAwayId].every((pid) =>
-      data.players.some((p) => p.id === pid)
-    );
-    if (!playersExist) throw new Error("Jogador não encontrado");
+  const { data: match, error: fetchError } = await supabase.from("matches").select("*").eq("id", id).single();
+  if (fetchError) return res.status(404).json({ error: "Partida nao encontrada" });
 
-    if (!validateScore(homeScore ?? match.homeScore) || !validateScore(awayScore ?? match.awayScore)) {
-      throw new Error("Placar inválido");
-    }
+  const newHomeId = homeId || match.homeId;
+  const newAwayId = awayId || match.awayId;
+  if (!newHomeId || !newAwayId || newHomeId === newAwayId) {
+    return res.status(400).json({ error: "Selecione dois jogadores diferentes" });
+  }
 
-    const validOwners = [newHomeId, newAwayId];
-    const normalizedScorers = Array.isArray(scorers)
-      ? scorers
-          .map((s) => ({
-            name: (s.name || s.scorerName || "").trim(),
-            goals: Number(s.goals),
-            ownerId: s.ownerId || s.playerId,
-          }))
-          .filter(
-            (s) =>
-              s.name &&
-              validateScore(s.goals) &&
-              s.goals > 0 &&
-              s.ownerId &&
-              validOwners.includes(s.ownerId)
-          )
-          .map((s) => ({ name: s.name, goals: Number(s.goals), ownerId: s.ownerId }))
-      : match.scorers || [];
+  const playersOk = await ensurePlayersExist([newHomeId, newAwayId]);
+  if (!playersOk) return res.status(400).json({ error: "Jogador nao encontrado" });
 
-    const sumHome = normalizedScorers
-      .filter((s) => s.ownerId === newHomeId)
-      .reduce((acc, s) => acc + s.goals, 0);
-    const sumAway = normalizedScorers
-      .filter((s) => s.ownerId === newAwayId)
-      .reduce((acc, s) => acc + s.goals, 0);
-    if (sumHome > Number(homeScore ?? match.homeScore) || sumAway > Number(awayScore ?? match.awayScore)) {
-      throw new Error("Gols dos artilheiros excedem o placar informado");
-    }
+  const finalHomeScore = Number(homeScore ?? match.homeScore);
+  const finalAwayScore = Number(awayScore ?? match.awayScore);
+  if (!validateScore(finalHomeScore) || !validateScore(finalAwayScore)) {
+    return res.status(400).json({ error: "Placar invalido" });
+  }
 
-    Object.assign(match, {
-      homeId: newHomeId,
-      awayId: newAwayId,
-      homeScore: Number(homeScore ?? match.homeScore),
-      awayScore: Number(awayScore ?? match.awayScore),
-      scorers: normalizedScorers,
-      submittedBy: submittedBy?.trim() || match.submittedBy,
-      updatedAt: new Date().toISOString(),
-      evidence: evidence && evidence.data ? evidence : match.evidence || null,
-    });
-    return match;
-  }).catch((err) => res.status(400).json({ error: err.message }));
+  const normalizedScorers = Array.isArray(scorers)
+    ? normalizeScorers(scorers, [newHomeId, newAwayId])
+    : match.scorers || [];
+  try {
+    validateScorerSums(newHomeId, newAwayId, finalHomeScore, finalAwayScore, normalizedScorers);
+  } catch (err) {
+    return res.status(400).json({ error: err.message });
+  }
 
-  if (updated) res.json(updated);
+  const updatePayload = {
+    homeId: newHomeId,
+    awayId: newAwayId,
+    homeScore: finalHomeScore,
+    awayScore: finalAwayScore,
+    scorers: normalizedScorers,
+    submittedBy: submittedBy?.trim() || match.submittedBy,
+    updatedAt: new Date().toISOString(),
+    evidence: evidence && evidence.data ? evidence : match.evidence || null,
+  };
+
+  const { data, error } = await supabase
+    .from("matches")
+    .update(updatePayload)
+    .eq("id", id)
+    .select()
+    .single();
+  if (error) return res.status(400).json({ error: error.message });
+  res.json(data);
 });
 
 app.delete("/api/matches/:id", requireAdmin, async (req, res) => {
   const { id } = req.params;
-  const removed = await updateData((data) => {
-    const idx = data.matches.findIndex((m) => m.id === id);
-    if (idx === -1) throw new Error("Partida não encontrada");
-    data.matches.splice(idx, 1);
-    return true;
-  }).catch((err) => res.status(404).json({ error: err.message }));
-
-  if (removed) res.json({ ok: true });
+  const { error } = await supabase.from("matches").delete().eq("id", id);
+  if (error) return res.status(404).json({ error: error.message });
+  res.json({ ok: true });
 });
 
 app.use((err, _req, res, _next) => {
