@@ -77,6 +77,52 @@ function validateScorerSums(homeId, awayId, homeScore, awayScore, scorers) {
   }
 }
 
+function toCamel(row = {}) {
+  const entries = Object.entries(row).map(([k, v]) => {
+    if (k === "homeid") return ["homeId", v];
+    if (k === "awayid") return ["awayId", v];
+    if (k === "homescore") return ["homeScore", v];
+    if (k === "awayscore") return ["awayScore", v];
+    if (k === "submittedby") return ["submittedBy", v];
+    if (k === "createdat") return ["createdAt", v];
+    if (k === "approvedat") return ["approvedAt", v];
+    if (k === "updatedat") return ["updatedAt", v];
+    return [k, v];
+  });
+  return Object.fromEntries(entries);
+}
+
+function toSnakeSuggestion(payload) {
+  return {
+    id: payload.id,
+    homeid: payload.homeId,
+    awayid: payload.awayId,
+    homescore: payload.homeScore,
+    awayscore: payload.awayScore,
+    scorers: payload.scorers,
+    submittedby: payload.submittedBy,
+    createdat: payload.createdAt,
+    evidence: payload.evidence,
+  };
+}
+
+function toSnakeMatch(payload) {
+  return {
+    id: payload.id,
+    homeid: payload.homeId,
+    awayid: payload.awayId,
+    homescore: payload.homeScore,
+    awayscore: payload.awayScore,
+    scorers: payload.scorers,
+    submittedby: payload.submittedBy,
+    createdat: payload.createdAt,
+    approvedat: payload.approvedAt,
+    updatedat: payload.updatedAt,
+    status: payload.status,
+    evidence: payload.evidence,
+  };
+}
+
 app.post("/api/admin/login", (req, res) => {
   const { user, password } = req.body || {};
   if (user === ADMIN_USER && password === ADMIN_PASSWORD) {
@@ -151,9 +197,9 @@ app.get("/api/suggestions", requireAdmin, async (_req, res) => {
   const { data, error } = await supabase
     .from("suggestions")
     .select("*")
-    .order("createdAt", { ascending: false });
+    .order("createdat", { ascending: false });
   if (error) return res.status(500).json({ error: error.message });
-  res.json(data);
+  res.json(data.map(toCamel));
 });
 
 app.post("/api/suggestions", async (req, res) => {
@@ -188,9 +234,13 @@ app.post("/api/suggestions", async (req, res) => {
     evidence: evidence && evidence.data ? evidence : null,
   };
 
-  const { data, error } = await supabase.from("suggestions").insert([payload]).select().single();
+  const { data, error } = await supabase
+    .from("suggestions")
+    .insert([toSnakeSuggestion(payload)])
+    .select()
+    .single();
   if (error) return res.status(400).json({ error: error.message });
-  res.json(data);
+  res.json(toCamel(data));
 });
 
 app.post("/api/suggestions/:id/approve", requireAdmin, async (req, res) => {
@@ -212,13 +262,13 @@ app.post("/api/suggestions/:id/approve", requireAdmin, async (req, res) => {
 
   const { error: insertError, data: inserted } = await supabase
     .from("matches")
-    .insert([matchPayload])
+    .insert([toSnakeMatch(matchPayload)])
     .select()
     .single();
   if (insertError) return res.status(400).json({ error: insertError.message });
 
   await supabase.from("suggestions").delete().eq("id", id);
-  res.json(inserted);
+  res.json(toCamel(inserted));
 });
 
 app.delete("/api/suggestions/:id", requireAdmin, async (req, res) => {
@@ -233,10 +283,10 @@ app.get("/api/matches", async (_req, res) => {
   const { data, error } = await supabase
     .from("matches")
     .select("*")
-    .order("approvedAt", { ascending: false })
-    .order("createdAt", { ascending: false });
+    .order("approvedat", { ascending: false })
+    .order("createdat", { ascending: false });
   if (error) return res.status(500).json({ error: error.message });
-  res.json(data);
+  res.json(data.map(toCamel));
 });
 
 app.patch("/api/matches/:id", requireAdmin, async (req, res) => {
@@ -283,12 +333,12 @@ app.patch("/api/matches/:id", requireAdmin, async (req, res) => {
 
   const { data, error } = await supabase
     .from("matches")
-    .update(updatePayload)
+    .update(toSnakeMatch({ ...match, ...updatePayload }))
     .eq("id", id)
     .select()
     .single();
   if (error) return res.status(400).json({ error: error.message });
-  res.json(data);
+  res.json(toCamel(data));
 });
 
 app.delete("/api/matches/:id", requireAdmin, async (req, res) => {
